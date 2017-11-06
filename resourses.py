@@ -1,8 +1,12 @@
 import peewee
+# import sqlite3
+# import psycopg2
+# import PyMySQL
 from peewee import *
 
 print "connect db"
-db = MySQLDatabase('space_team', user='root',passwd='3421')
+# db = MySQLDatabase('space_team', user='root',passwd='3421')
+db = SqliteDatabase('space_team.db')
 
 
 class ShipModel(peewee.Model):
@@ -29,6 +33,20 @@ class ShipModuleTask(peewee.Model):
     class Meta:
         database = db
 
-print "create_tables"
-# db.create_tables([ShipModel, Ship])
-# db.create_tables([ShipModuleTask])
+
+
+tables_list = [ShipModel, Ship, ShipModuleTask]
+
+def create_table_if_necessary(table):
+    if not table.table_exists():
+        print(table.__name__, "does not exist, creating...")
+        db.create_table(table)
+        print(table.__name__, "created")
+    else:
+        print(table.__name__, "found")
+
+print("checking db tables existence")
+for table in tables_list:
+    create_table_if_necessary(table)
+
+print("db tables are ready")

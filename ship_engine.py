@@ -2,6 +2,8 @@ import json
 import time
 import resourses
 import math
+
+from math_wrapper import get_best_mode
 from resourses import *
 from datetime import date
 from math import sqrt
@@ -11,12 +13,11 @@ SHIELD_BURN = 0.01
 SHIELD_SIZE = 10
 
 def add_ship_model(ship_name, width, height):
-# typhon = ShipModel.create(name='Typhon', 
     ship_json = json.dumps(
         {
             "width":width, 
             "height":height,
-            "shield": [0] * int(2 * math.pi * (width + height) / SHIELD_SIZE), 
+            "shield": [0] * int(2 * math.pi * (width + height) / SHIELD_SIZE),
 
             "a":0, "va":0, 
             "x":0, "vx":0, 
@@ -150,7 +151,7 @@ def act_ship(ship):
     # herb_mittens.delete_instance()
 
     cmap = build_control_map(ship_obj)
-    pick_from_control_map(ship_obj, cmap, target_acc[0], target_acc[1], target_acc[2])
+    pick_from_control_map2(ship_obj, cmap, target_acc[0], target_acc[1], target_acc[2])
 
     # print ship_obj['shield']
     ship.json = json.dumps(ship_obj)
@@ -273,13 +274,91 @@ def build_control_map(ship_obj):
             vy -= math.sin(engine_angle) * liner_part * engine_power
             va += radial_part * engine_power
 
+            vx = round(vx, 5)
+            vy = round(vy, 5)
+            va = round(va, 5)
+
         control_map[(vx, vx, va)] = i
         print i
     print len(control_map), control_map
     return control_map
 
+def pick_from_control_map2(ship_obj, control_map, vx, vy, va):
+    task = (vx, vy, va)
+
+    engines = get_modules_by_filters(ship_obj, [{'attribute':'type', 'value':'engine'}])
+
+    if task in control_map:
+        for module_counter in range(0, len(engines)):
+            print 'engine #', module_counter
+            module = engines[module_counter]
+            engines_mode = control_map[task]
+            if (engines_mode >> module_counter) % 2:
+                module['power_fraction'] = 1
+                print 'engine is on'
+            else:
+                module['power_fraction'] = 0
+                print 'engine is off'
+        return
+
+    # try:
+    picked = get_best_mode(control_map, task)
+    # except Exception as e:
+    #     print e
+        # raise e
+        # return
+    engine_powers = []
+
+    base_mode = picked['base']
+
+    for module_counter in range(0, len(engines)):
+        print 'engine #', module_counter
+        # module = engines[module_counter]
+        engines_mode = base_mode
+        if (engines_mode >> module_counter) % 2:
+            engine_powers += [1]
+            # module['power_fraction'] = 1
+            # print 'engine is on'
+        else:
+            engine_powers += [0]
+            # module['power_fraction'] = 0
+            # print 'engine is off'
+
+    print 'base', engine_powers
+    engine_modifications = list(engine_powers)
+
+    for mode, fraction in picked['shifts'].iteritems():
+        for module_counter in range(0, len(engines)):
+            print 'engine #', module_counter
+            # module = engines[module_counter]
+            # engines_mode = picked['base']
+            # delta_mode = base_mode - mode
+            if (mode >> module_counter) % 2 and engine_powers[module_counter] == 0:
+                engine_modifications[module_counter] += fraction
+                # module['power_fraction'] = 1
+                # print 'engine is on'
+            elif engine_powers[module_counter] == 1:
+                engine_modifications[module_counter] -= fraction
+
+    for i in range(0, len(engines)):
+        print 'engine #', i
+        engine = engines[i]
+        engine_powers[i] += engine_modifications[i]
+        print engine_powers[i], engine_modifications[i]
+        if engine_powers[i] > 1:
+            engine_powers[i] = 1
+        if engine_powers[i] < 0:
+            engine_powers[i] = 0
+        engine['power_fraction'] = engine_powers[i]
+        print 'result', engine_powers[i]
+
+    return
+
 def pick_from_control_map(ship_obj, control_map, vx, vy, va):
     task = (vx, vy, va)
+    print '!!!'
+    print control_map
+    print '!!!'
 
     engines = get_modules_by_filters(ship_obj, [{'attribute':'type', 'value':'engine'}])
 
